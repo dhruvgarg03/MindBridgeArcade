@@ -4,7 +4,7 @@ myenv/
 # Ignore Python cache
 __pycache__/
 *.py[cod]
-
+*.pyc
 # Ignore system files
 .DS_Store
 Thumbs.db
@@ -16,6 +16,6 @@ Thumbs.db
 *.exe
 *.so
 *.dll
-*.pyc
+
 # Ignore state or debug files (optional)
 *.swp
