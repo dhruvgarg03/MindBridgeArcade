@@ -1,0 +1,30 @@
+Player 1 score: 0
+Player 2 score: 0
+Current player: X
+
+Cell States:
+Cell 0: sides=[False, False, False, False], winner=None
+Cell 1: sides=[False, False, False, False], winner=None
+Cell 2: sides=[False, False, False, False], winner=None
+Cell 3: sides=[False, False, False, False], winner=None
+Cell 4: sides=[False, False, False, False], winner=None
+Cell 5: sides=[False, False, False, False], winner=None
+Cell 6: sides=[False, False, False, False], winner=None
+Cell 7: sides=[False, False, False, False], winner=None
+Cell 8: sides=[False, False, False, False], winner=None
+Cell 9: sides=[False, False, False, False], winner=None
+Cell 10: sides=[False, False, False, False], winner=None
+Cell 11: sides=[False, False, False, False], winner=None
+Cell 12: sides=[False, False, False, False], winner=None
+Cell 13: sides=[False, False, False, False], winner=None
+Cell 14: sides=[False, False, False, False], winner=None
+Cell 15: sides=[False, False, False, False], winner=None
+Cell 16: sides=[False, False, False, False], winner=None
+Cell 17: sides=[False, False, False, False], winner=None
+Cell 18: sides=[False, False, False, False], winner=None
+Cell 19: sides=[False, False, False, False], winner=None
+Cell 20: sides=[False, False, False, False], winner=None
+Cell 21: sides=[False, False, False, False], winner=None
+Cell 22: sides=[False, False, False, False], winner=None
+Cell 23: sides=[False, False, False, False], winner=None
+Cell 24: sides=[False, False, False, False], winner=None
