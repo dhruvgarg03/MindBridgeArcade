@@ -1,6 +1,6 @@
 from .game import *
 import pygame
-from project.dashboard  import dashboard_loop
+from dashboard  import dashboard_loop
 pygame.init()
 def run():
     game = Game()

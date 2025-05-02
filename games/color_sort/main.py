@@ -20,6 +20,18 @@ tooltip = Tooltip()
 
 fps = 60
 timer = pygame.time.Clock()
+RED = 0
+ORANGE = 1
+LIGHT_BLUE = 2
+DARK_BLUE = 3
+DARK_GREEN = 4
+PINK = 5
+PURPLE = 6
+DARK_GRAY = 7
+BROWN = 8
+LIGHT_GREEN = 9
+YELLOW = 10
+WHITE = 11
 color_choices = ['red', 'orange', 'light blue', 'dark blue', 'dark green', 'pink', 'purple', 'dark gray',
                  'brown', 'light green', 'yellow', 'white']
 tube_colors = []
@@ -35,63 +47,101 @@ moves=0
 
 # select a number of tubes and pick random colors upon new game setup
 def generate_start():
-    global previous_tubes_colors
-    tubes_number = random.randint(4, 6)
-    tubes_colors = []
-    available_colors = []
-    for i in range(tubes_number):
-        tubes_colors.append([])
-        if i < tubes_number - 2:
-            for j in range(4):
-                available_colors.append(i)
-    for i in range(tubes_number - 2):
-        for j in range(4):
-            color = random.choice(available_colors)
-            tubes_colors[i].append(color)
-            available_colors.remove(color)
+    num_colors = 4  # or however many colors you want to use (max 11 for now)
+    num_tubes = num_colors + 2
+    tube_colorss = [[] for _ in range(num_tubes)]
 
-    previous_tubes_colors = copy.deepcopy(tubes_colors)
-    print(tubes_colors)
-    print(tubes_number)
-    return tubes_number, tubes_colors
+    # Create a pool with 4 entries of each color (fixed indices from 0 to num_colors-1)
+    color_pool = []
+    for color_index in range(num_colors):
+        color_pool.extend([color_index] * 4)  # 4 of each color
 
+    random.shuffle(color_pool)  # Shuffle the pool, not the color index mapping
+
+    # Fill the tubes (except last two empty tubes)
+    tube_index = 0
+    while color_pool:
+        if len(tube_colorss[tube_index]) < 4:
+            tube_colorss[tube_index].append(color_pool.pop())
+        tube_index = (tube_index + 1) % (num_tubes - 2)  # Only fill first (num_tubes - 2) tubes
+    # for tube in tube_colorss:
+    #     tube.reverse()
+    return tube_colorss
 
 # draw all tubes and colors on screen, as well as indicating what tube was selected
 def draw_tubes(tubes_num, tube_cols):
     tube_boxes = []
+
     if tubes_num % 2 == 0:
         tubes_per_row = tubes_num // 2
         offset = False
     else:
         tubes_per_row = tubes_num // 2 + 1
         offset = True
+
     spacing = WIDTH / tubes_per_row
+
+    # Draw top row
     for i in range(tubes_per_row):
         for j in range(len(tube_cols[i])):
-            pygame.draw.rect(screen, color_choices[tube_cols[i][j]], [5 + spacing * i, 200 - (50 * j), 65, 50], 0, 3)
+            pygame.draw.rect(
+                screen,
+                color_choices[tube_cols[i][j]],
+                [5 + spacing * i, 200 - (50 * j), 65, 50],
+                0,
+                3
+            )
         box = pygame.draw.rect(screen, 'blue', [5 + spacing * i, 50, 65, 200], 5, 5)
         if select_rect == i:
             pygame.draw.rect(screen, 'green', [5 + spacing * i, 50, 65, 200], 3, 5)
         tube_boxes.append(box)
+
+    # Draw bottom row
     if offset:
         for i in range(tubes_per_row - 1):
-            for j in range(len(tube_cols[i + tubes_per_row])):
-                pygame.draw.rect(screen, color_choices[tube_cols[i + tubes_per_row][j]],
-                                 [(spacing * 0.5) + 5 + spacing * i, 450 - (50 * j), 65, 50], 0, 3)
-            box = pygame.draw.rect(screen, 'blue', [(spacing * 0.5) + 5 + spacing * i, 300, 65, 200], 5, 5)
-            if select_rect == i + tubes_per_row:
-                pygame.draw.rect(screen, 'green', [(spacing * 0.5) + 5 + spacing * i, 300, 65, 200], 3, 5)
-            tube_boxes.append(box)
+            if i + tubes_per_row < len(tube_cols):
+                for j in range(len(tube_cols[i + tubes_per_row])):
+                    pygame.draw.rect(
+                        screen,
+                        color_choices[tube_cols[i + tubes_per_row][j]],
+                        [(spacing * 0.5) + 5 + spacing * i, 450 - (50 * j), 65, 50],
+                        0,
+                        3
+                    )
+                box = pygame.draw.rect(
+                    screen,
+                    'blue',
+                    [(spacing * 0.5) + 5 + spacing * i, 300, 65, 200],
+                    5,
+                    5
+                )
+                if select_rect == i + tubes_per_row:
+                    pygame.draw.rect(
+                        screen,
+                        'green',
+                        [(spacing * 0.5) + 5 + spacing * i, 300, 65, 200],
+                        3,
+                        5
+                    )
+                tube_boxes.append(box)
     else:
         for i in range(tubes_per_row):
-            for j in range(len(tube_cols[i + tubes_per_row])):
-                pygame.draw.rect(screen, color_choices[tube_cols[i + tubes_per_row][j]], [5 + spacing * i,
-                                                                                          450 - (50 * j), 65, 50], 0, 3)
-            box = pygame.draw.rect(screen, 'blue', [5 + spacing * i, 300, 65, 200], 5, 5)
-            if select_rect == i + tubes_per_row:
-                pygame.draw.rect(screen, 'green', [5 + spacing * i, 300, 65, 200], 3, 5)
-            tube_boxes.append(box)
+            if i + tubes_per_row < len(tube_cols):
+                for j in range(len(tube_cols[i + tubes_per_row])):
+                    pygame.draw.rect(
+                        screen,
+                        color_choices[tube_cols[i + tubes_per_row][j]],
+                        [5 + spacing * i, 450 - (50 * j), 65, 50],
+                        0,
+                        3
+                    )
+                box = pygame.draw.rect(screen, 'blue', [5 + spacing * i, 300, 65, 200], 5, 5)
+                if select_rect == i + tubes_per_row:
+                    pygame.draw.rect(screen, 'green', [5 + spacing * i, 300, 65, 200], 3, 5)
+                tube_boxes.append(box)
+
     return tube_boxes
+
 
 
 # determine the top color of the selected tube and destination tube,
@@ -184,7 +234,8 @@ while run:
 
     # generate game board on new game, make a copy of the colors in case of restart
     if new_game:
-        tubes, tube_colors = generate_start()
+        tube_colors = generate_start()
+        tube = len(tube_colors)
         initial_colors = copy.deepcopy(tube_colors)
         new_game = False
     # draw tubes every cycle
