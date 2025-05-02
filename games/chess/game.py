@@ -1,9 +1,9 @@
 import os
 import pygame
 from pygame.locals import *
-from piece import Piece
-from chess import Chess
-from utils import Utils
+from project.games.chess.piece import Piece
+from project.games.chess.chess import Chess
+from project.games.chess.utils import Utils
 import copy
 SUGGEST_BUTTON_RECT = pygame.Rect(660, 100, 140, 40)  # x, y, width, height
 class Game:
@@ -33,6 +33,7 @@ class Game:
         self.board = self.create_starting_board()
         # get location of game icon
         icon_src = os.path.join(self.resources, "chess_icon.png")
+        print(icon_src)
         # load game icon
         icon = pygame.image.load(icon_src)
         # set game icon

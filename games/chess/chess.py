@@ -2,8 +2,8 @@ import pygame
 from pygame.locals import *
 import random
 
-from piece import Piece
-from utils import Utils
+from .piece import *
+from .utils import *
 
 import time
 
