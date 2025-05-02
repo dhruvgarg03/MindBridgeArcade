@@ -16,6 +16,6 @@ Thumbs.db
 *.exe
 *.so
 *.dll
-
+*.pyc
 # Ignore state or debug files (optional)
 *.swp
