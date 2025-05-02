@@ -4,6 +4,9 @@ import random
 import pygame
 import os
 from dashboard import dashboard_loop
+from ai.aiCall import ai_call
+from tooltip.tooltip import Tooltip
+import json
 # initialize pygame
 pygame.init()
 
@@ -13,6 +16,8 @@ HEIGHT = 600
 screen = pygame.display.set_mode([WIDTH, HEIGHT])
 pygame.display.set_caption('Water Sort PyGame')
 font = pygame.font.Font('freesansbold.ttf', 24)
+tooltip = Tooltip()
+
 fps = 60
 timer = pygame.time.Clock()
 color_choices = ['red', 'orange', 'light blue', 'dark blue', 'dark green', 'pink', 'purple', 'dark gray',
@@ -30,6 +35,7 @@ moves=0
 
 # select a number of tubes and pick random colors upon new game setup
 def generate_start():
+    global previous_tubes_colors
     tubes_number = random.randint(4, 6)
     tubes_colors = []
     available_colors = []
@@ -43,6 +49,8 @@ def generate_start():
             color = random.choice(available_colors)
             tubes_colors[i].append(color)
             available_colors.remove(color)
+
+    previous_tubes_colors = copy.deepcopy(tubes_colors)
     print(tubes_colors)
     print(tubes_number)
     return tubes_number, tubes_colors
@@ -113,6 +121,7 @@ def calc_move(colors, selected_rect, destination):
                     colors[destination].append(color_on_top)
                     colors[selected_rect].pop(-1)
     print(colors, length)
+    previous_tubes_colors = copy.deepcopy(colors)
     return colors
 
 
@@ -185,6 +194,7 @@ while run:
     win = check_victory(tube_colors)
     # event handling - Quit button exits, clicks select tubes, enter and space for restart and new board
     for event in pygame.event.get():
+        tooltip.handle_event(event)
         if event.type == pygame.QUIT:
             run = False
         if event.type == pygame.KEYUP:
@@ -194,7 +204,20 @@ while run:
                 new_game = True
         if event.type == pygame.MOUSEBUTTONDOWN:
             if suggest_button_rect.collidepoint(event.pos):
-                save_current_state(tube_colors, moves)
+                # save_current_state(tube_colors, moves)
+                current_state_str = json.dumps(previous_tubes_colors)
+
+                prompt = (
+                "This is the current state of my color sort game each row of the 2d array represents a tube and the different value in the columns represents the different colors in that tube now i want the next best possible move to complete the game and give the move and explain it briefly which color to move from which tube to which tube" \
+                )
+
+             # Call AI
+                ai_response = ai_call(current_state_str, prompt)
+
+                tooltip.show(ai_response)
+
+                print("AI Suggestion:", ai_response)
+                print("Suggest Move button clicked : ", previous_tubes_colors)
             # elif not selected:
             #     for item in range(len(tube_rects)):
             #         if tube_rects[item].collidepoint(event.pos):
@@ -205,6 +228,7 @@ while run:
                 moves = 0  # reset move counter on restart
                 selected = False
                 select_rect = 100
+                previous_tubes_colors = copy.deepcopy(tube_colors)
             elif dashboard_button_rect.collidepoint(event.pos):
                 run = False  # Exit the game loop to go back to the dashboard
                 dashboard_loop()
@@ -222,6 +246,7 @@ while run:
                         moves += 1  # increment move count here!
                         selected = False
                         select_rect = 100
+                        previous_tubes_colors = copy.deepcopy(tube_colors)
 
     # draw 'victory' text when winning in middle, always show restart and new board text at top
     if win:
@@ -233,6 +258,8 @@ while run:
     # Draw 'Suggest Move' button at bottom
 
     screen.blit(restart_text, (10, 10))
+
+    tooltip.draw(screen)
 
     # display all drawn items on screen, exit pygame if run == False
     pygame.display.flip()

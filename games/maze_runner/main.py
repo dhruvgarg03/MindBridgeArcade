@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import messagebox
 import os
 import random
+from ai.aiCall import ai_call
+from tooltip.tinker_tooltip import Tooltip
 
 CELL_SIZE = 50
 
@@ -175,6 +177,29 @@ class MazeRunner:
             f.write(f"Score: {self.score}\n")
 
         suggested = self.get_next_best_move()
+        level_file = self.level_files[self.level_index]
+        with open(level_file, "r") as f:
+            lines = [line.strip() for line in f.readlines() if line.strip()]
+        print(f"Suggested Move: {suggested} ", lines )
+        prompt = (
+                "this is mazerunner game and i have a matrix showing one where player can be moved i am giving you the current position and matrix and suggested move you just have to give me the reason why this move is better."
+                )
+
+        current_state_str = "\n".join(lines)
+        current_state_str += f"\nPlayer Position: ({self.player_x}, {self.player_y})\n"
+        current_state_str += f"suggested move: {suggested}\n"
+        ai_response = ai_call(current_state_str, prompt)
+        # print(f"AI Response: {ai_response}")
+        messagebox.showinfo("AI Suggestion", ai_response)
+        self.canvas.delete("suggestion")
+        self.canvas.delete("ai_suggestion")
+        if ai_response:
+            x, y = suggested
+            self.canvas.create_rectangle(
+                x * CELL_SIZE, y * CELL_SIZE, (x + 1) * CELL_SIZE, (y + 1) * CELL_SIZE,
+                fill="#e67e22", outline="#d35400", width=3, tags="ai_suggestion"
+            )
+
         if suggested:
             x, y = suggested
             self.canvas.create_rectangle(
@@ -258,7 +283,16 @@ def create_levels():
             "1111111101",
             "1000000001",
             "1111111111"
-        ]
+        ],
+        "level9.txt": [
+            "111111111",
+            "100000001",
+            "101111101",
+            "100100101",
+            "111101101",
+            "100000001",
+            "111111111"
+        ],
     }
 
     # Create levels directory if it doesn't exist
