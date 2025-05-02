@@ -1,9 +1,9 @@
 import os
 import pygame
 from pygame.locals import *
-from project.games.chess.piece import Piece
-from project.games.chess.chess import Chess
-from project.games.chess.utils import Utils
+from games.chess.piece import Piece
+from games.chess.chess import Chess
+from games.chess.utils import Utils
 import copy
 SUGGEST_BUTTON_RECT = pygame.Rect(660, 100, 140, 40)  # x, y, width, height
 class Game:
