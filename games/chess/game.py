@@ -5,11 +5,75 @@ from games.chess.piece import Piece
 from games.chess.chess import Chess
 from games.chess.utils import Utils
 import copy
+from dashboard import dashboard_loop
 SUGGEST_BUTTON_RECT = pygame.Rect(660, 100, 140, 40)  # x, y, width, height
+DASHBOARD_BUTTON_RECT = pygame.Rect(660, 160, 180, 50)
+
 class Game:
     def __init__(self):
+        # Add in __init__ of ChessAI class
+        self.piece_values = {
+            'pawn': 1,
+            'knight': 10,
+            'bishop': 13.5,
+            'rook': 40,
+            'queen': 50,
+            'king': 100
+        }
+
+        self.pst = {
+            'pawn': [[0, 0, 0, 0, 0, 0, 0, 0],
+                     [5, 5, 5, -5, -5, 5, 5, 5],
+                     [1, 1, 2, 3, 3, 2, 1, 1],
+                     [0.5, 0.5, 1, 2.5, 2.5, 1, 0.5, 0.5],
+                     [0, 0, 0, 2, 2, 0, 0, 0],
+                     [0.5, -0.5, -1, 0, 0, -1, -0.5, 0.5],
+                     [0.5, 1, 1, -2, -2, 1, 1, 0.5],
+                     [0, 0, 0, 0, 0, 0, 0, 0]],
+            'knight': [[-5, -4, -3, -3, -3, -3, -4, -5],
+                       [-4, -2, 0, 0, 0, 0, -2, -4],
+                       [-3, 0, 1, 1.5, 1.5, 1, 0, -3],
+                       [-3, 0.5, 1.5, 2, 2, 1.5, 0.5, -3],
+                       [-3, 0, 1.5, 2, 2, 1.5, 0, -3],
+                       [-3, 0.5, 1, 1.5, 1.5, 1, 0.5, -3],
+                       [-4, -2, 0, 0.5, 0.5, 0, -2, -4],
+                       [-5, -4, -3, -3, -3, -3, -4, -5]],
+            'bishop': [[-2, -1, -1, -1, -1, -1, -1, -2],
+                       [-1, 0, 0, 0, 0, 0, 0, -1],
+                       [-1, 0, 0.5, 1, 1, 0.5, 0, -1],
+                       [-1, 0.5, 0.5, 1, 1, 0.5, 0.5, -1],
+                       [-1, 0, 1, 1, 1, 1, 0, -1],
+                       [-1, 1, 1, 1, 1, 1, 1, -1],
+                       [-1, 0.5, 0, 0, 0, 0, 0.5, -1],
+                       [-2, -1, -1, -1, -1, -1, -1, -2]],
+            'rook': [[0, 0, 0, 0, 0, 0, 0, 0],
+                     [0.5, 1, 1, 1, 1, 1, 1, 0.5],
+                     [-0.5, 0, 0, 0, 0, 0, 0, -0.5],
+                     [-0.5, 0, 0, 0, 0, 0, 0, -0.5],
+                     [-0.5, 0, 0, 0, 0, 0, 0, -0.5],
+                     [-0.5, 0, 0, 0, 0, 0, 0, -0.5],
+                     [-0.5, 0, 0, 0, 0, 0, 0, -0.5],
+                     [0, 0, 0, 0.5, 0.5, 0, 0, 0]],
+            'queen': [[-2, -1, -1, -0.5, -0.5, -1, -1, -2],
+                      [-1, 0, 0, 0, 0, 0, 0, -1],
+                      [-1, 0, 0.5, 0.5, 0.5, 0.5, 0, -1],
+                      [-0.5, 0, 0.5, 0.5, 0.5, 0.5, 0, -0.5],
+                      [0, 0, 0.5, 0.5, 0.5, 0.5, 0, -0.5],
+                      [-1, 0.5, 0.5, 0.5, 0.5, 0.5, 0, -1],
+                      [-1, 0, 0.5, 0, 0, 0, 0, -1],
+                      [-2, -1, -1, -0.5, -0.5, -1, -1, -2]],
+            'king': [[-3, -4, -4, -5, -5, -4, -4, -3],
+                     [-3, -4, -4, -5, -5, -4, -4, -3],
+                     [-3, -4, -4, -5, -5, -4, -4, -3],
+                     [-3, -4, -4, -5, -5, -4, -4, -3],
+                     [-2, -3, -3, -4, -4, -3, -3, -2],
+                     [-1, -2, -2, -2, -2, -2, -2, -1],
+                     [2, 2, 0, 0, 0, 0, 2, 2],
+                     [2, 3, 1, 0, 0, 1, 3, 2]]
+        }
+
         # screen dimensions
-        screen_width = 800
+        screen_width = 850
         screen_height = 670
         # flag to know if game menu has been showed
         self.menu_showed = False
@@ -57,21 +121,31 @@ class Game:
             ["black_rook", "black_knight", "black_bishop", "black_queen", "black_king", "black_bishop", "black_knight",
              "black_rook"]
         ]
-    def evaluate_board(self,board):
-        # Simple material count evaluation
-        piece_values = {
-            'pawn': 1, 'knight': 3, 'bishop': 3, 'rook': 5, 'queen': 9, 'king': 0
-        }
-        value = 0
-        for row in board:
-            for piece in row:
+    def piece_square_bonus(self, ptype, color, y, x):
+        table = self.pst.get(ptype)
+        if table:
+            return table[y][x] if color == 'white' else table[7 - y][x]
+        return 0
+    def evaluate_board(self, board):
+        score = 0
+        for y, row in enumerate(board):
+            for x, piece in enumerate(row):
                 if piece:
                     color, ptype = piece.split('_')
+                    value = self.piece_values.get(ptype, 0)
+                    bonus = self.piece_square_bonus(ptype, color, y, x)
                     if color == 'white':
-                        value += piece_values[ptype]
+                        score += value + bonus
                     else:
-                        value -= piece_values[ptype]
-        return value
+                        score -= value + bonus
+
+        # Mobility bonus
+        white_moves = len(self.generate_legal_moves(board, 'white'))
+        black_moves = len(self.generate_legal_moves(board, 'black'))
+        mobility = 0.1 * (white_moves - black_moves)
+        score += mobility
+
+        return score
 
     def piece_location_to_board(self,piece_location):
         board = [[None for _ in range(8)] for _ in range(8)]
@@ -192,13 +266,50 @@ class Game:
         new_board[to_y][to_x] = new_board[from_y][from_x]
         new_board[from_y][from_x] = None
         return new_board
+    def get_piece_value(self, piece):
+        if piece is None:
+            return 0
+        values = {
+            'pawn': 1,
+            'knight': 10,
+            'bishop': 13.5,
+            'rook': 40,
+            'queen': 50,
+            'king': 100
+            # add your piece names as needed
+        }
+        piece_name = piece.lower()
+        if '_' in piece_name:
+            piece_name = piece_name.split('_')[1]
+        return values.get(piece.lower(), 0)
 
+    def move_heuristic(self, board, move, player):
+        (from_row, from_col), (to_row, to_col) = move
+        piece = board[from_row][from_col]
+        target = board[to_row][to_col]
+
+        # High score if capturing a piece
+        capture_score = 0
+        if target != '.':
+            capture_score = self.get_piece_value(target) - self.get_piece_value(piece)
+
+        # Slightly prefer central positions
+        center_bonus = 3 if (3 <= to_row <= 4 and 3 <= to_col <= 4) else 0
+
+        # Promotion detection (pawn reaches last rank)
+        promotion_bonus = 9 if (piece is not None and piece.lower() == 'p' and (to_row == 0 or to_row == 7)) else 0
+
+
+        return capture_score + center_bonus + promotion_bonus
+
+    
     def minimax(self,board, depth, alpha, beta, maximizing, color):
         if depth == 0:
             return self.evaluate_board(board), None
 
         best_move = None
         moves = self.generate_legal_moves(board, color)
+        moves.sort(key=lambda m: self.move_heuristic(board, m, color), reverse=True)
         if not moves:
             return self.evaluate_board(board), None
 
@@ -252,6 +363,7 @@ class Game:
 
         # get the width of a chess board square
         square_length = self.board_img.get_rect().width // 8
+        print(square_length)
 
         # initialize list that stores all places to put chess pieces on the board
         self.board_locations = []
@@ -288,6 +400,9 @@ class Game:
                         suggested_move = self.suggest_move(board_2d, self.chess.turn)
                         if suggested_move:
                             self.highlighted_move = suggested_move
+                    if DASHBOARD_BUTTON_RECT.collidepoint(event.pos):
+                        self.run = False
+                        dashboard_loop()
             winner = self.chess.winner
 
             if self.menu_showed == False:
@@ -297,6 +412,7 @@ class Game:
             else:
                 self.game()
                 self.draw_suggest_button()
+                self.draw_dashboard_button()
                 if hasattr(self, 'highlighted_move') and self.highlighted_move:
                     self.draw_highlighted_move(self.screen, self.highlighted_move)
 
@@ -322,7 +438,7 @@ class Game:
         # black color
         black_color = (0, 0, 0)
         # coordinates for "Play" button
-        start_btn = pygame.Rect(270, 300, 100, 50)
+        start_btn = pygame.Rect(360, 300, 100, 50)
         # show play button
         pygame.draw.rect(self.screen, black_color, start_btn)
 
@@ -333,7 +449,7 @@ class Game:
         small_font = pygame.font.SysFont("comicsansms", 20)
         # create text to be shown on the game menu
         welcome_text = big_font.render("Chess", False, black_color)
-        created_by = small_font.render("Created by Sheriff", True, black_color)
+        created_by = small_font.render(" ", True, black_color)
         start_btn_label = small_font.render("Play", True, white_color)
         
         # show welcome text
@@ -384,13 +500,21 @@ class Game:
         self.chess.play_turn()
         # draw pieces on the chess board
         self.chess.draw_pieces()
-
+    
     def draw_suggest_button(self):
-        pygame.draw.rect(self.screen, (50, 50, 50), SUGGEST_BUTTON_RECT)  # dark gray
+        pygame.draw.rect(self.screen, (50, 50, 50), SUGGEST_BUTTON_RECT) # dark gray
         font = pygame.font.SysFont("comicsansms", 20)
         text = font.render("Suggest Move", True, (255, 255, 255))
         text_rect = text.get_rect(center=SUGGEST_BUTTON_RECT.center)
         self.screen.blit(text, text_rect)
+    
+    def draw_dashboard_button(self):
+        pygame.draw.rect(self.screen, (50, 50, 50), DASHBOARD_BUTTON_RECT)  # dark gray
+        font = pygame.font.SysFont("comicsansms", 20)
+        text = font.render("Move to Dashboard", True, (255, 255, 255))
+        text_rect = text.get_rect(center=DASHBOARD_BUTTON_RECT.center)
+        self.screen.blit(text, text_rect)
+
     def declare_winner(self, winner):
         # background color
         bg_color = (255, 255, 255)
@@ -399,7 +523,7 @@ class Game:
         # black color
         black_color = (0, 0, 0)
         # coordinates for play again button
-        reset_btn = pygame.Rect(250, 300, 140, 50)
+        reset_btn = pygame.Rect(360, 300, 140, 50)
         # show reset button
         pygame.draw.rect(self.screen, black_color, reset_btn)
 
@@ -452,13 +576,23 @@ class Game:
             # clear winner
             self.chess.winner = ""
 
-    def draw_highlighted_move(self,screen, move):
+    # def draw_highlighted_move(self,screen, move):
+    #     if move:
+    #         (from_x, from_y), (to_x, to_y) = move
+    #         square_size = 80  # Use your actual square size
+    #         highlight_color = (0, 255, 0, 100)  # semi-transparent green
+    #         s = pygame.Surface((square_size, square_size), pygame.SRCALPHA)
+    #         s.fill(highlight_color)
+    #         screen.blit(s, (from_x * square_size, from_y * square_size))
+    #         screen.blit(s, (to_x * square_size, to_y * square_size))
+    def draw_highlighted_move(self, screen, move):
         if move:
             (from_x, from_y), (to_x, to_y) = move
-            square_size = 80  # Use your actual square size
+            square_size = 80  # Use your actual square size variable
             highlight_color = (0, 255, 0, 100)  # semi-transparent green
             s = pygame.Surface((square_size, square_size), pygame.SRCALPHA)
             s.fill(highlight_color)
-            screen.blit(s, (from_x * square_size, from_y * square_size))
-            screen.blit(s, (to_x * square_size, to_y * square_size))
+            # Add board offsets!
+            screen.blit(s, (self.board_offset_x + from_x * square_size, self.board_offset_y + from_y * square_size))
+            screen.blit(s, (self.board_offset_x + to_x * square_size, self.board_offset_y + to_y * square_size))
 

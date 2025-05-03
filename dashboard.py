@@ -74,6 +74,7 @@ def draw_dashboard():
     pygame.display.flip()
 
 def dashboard_loop():
+    pygame.display.set_mode((800,600))
     while True:
         draw_dashboard()
         for event in pygame.event.get():
