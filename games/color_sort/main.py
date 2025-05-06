@@ -3,7 +3,7 @@ import copy
 import random
 import pygame
 import os
-from dashboard import dashboard_loop
+# from dashboard import dashboard_loop
 from ai.aiCall import ai_call
 from tooltip.tooltip import Tooltip
 import json
@@ -141,12 +141,36 @@ def draw_tubes(tubes_num, tube_cols):
                 tube_boxes.append(box)
 
     return tube_boxes
+def validate_move(state, color, from_tube, to_tube):
+    """Validate if a move follows game rules."""
+    # Check tube indices
+    if from_tube < 0 or from_tube >= len(state) or to_tube < 0 or to_tube >= len(state):
+        return False
+    
+    # Source tube must not be empty
+    if not state[from_tube]:
+        return False
+    
+    # Get top color of source tube
+    top_color = state[from_tube][-1]
+    
+    # Suggested color must match actual top color
+    if top_color != color:
+        return False
+    
+    # Destination tube must be empty or have matching top color
+    if not state[to_tube]:
+        return True
+    return state[to_tube][-1] == color
+
 
 
 
 # determine the top color of the selected tube and destination tube,
 # as well as how long a chain of that color to move
 def calc_move(colors, selected_rect, destination):
+    if not validate_move(colors, colors[selected_rect][-1], selected_rect, destination):
+        return colors 
     chain = True
     color_on_top = 100
     length = 1
@@ -189,6 +213,27 @@ def check_victory(colors):
                         won = False
     return won
 
+def prepare_ai_input(tubes):
+    """Convert tubes to top-first format for AI analysis"""
+    return [list(reversed(tube)) for tube in tubes]
+
+def parse_ai_output(ai_response, game_tubes):
+    """Convert AI's top-first suggestion to game's bottom-first indices"""
+    # Flexible regex to handle different phrasing
+    match = re.search(r".*Move (\d+).*?Tube (\d+).*?Tube (\d+)", ai_response)
+    if not match:
+        return None
+    
+    color = int(match.group(1))
+    from_tube_ai = int(match.group(2))
+    to_tube_ai = int(match.group(3))
+    
+    # Convert AI's tube indices to game's perspective (same indices)
+    return {
+        'color': color,
+        'from_tube': from_tube_ai,
+        'to_tube': to_tube_ai
+    }
 
 # main game loop
 import os
@@ -200,117 +245,161 @@ def save_current_state(tube_colors, moves):
         for tube in tube_colors:
             f.write(",".join(str(color) for color in tube) + "\n")
     print(f"State saved at: {file_path}")
+def run():
+    global tube_colors, initial_colors, new_game, selected, select_rect, win, moves, previous_tubes_colors 
+    running = True
+    while running:
+        screen.fill((30, 30, 30))
+        timer.tick(fps)
 
-run = True
-while run:
-    screen.fill((30, 30, 30))
-    timer.tick(fps)
-    
-    # Button dimensions
-    button_width, button_height = 210, 50
-    button_padding = 20
-    bottom_margin = 20
-    button_y = HEIGHT - button_height - bottom_margin
+        # Button dimensions
+        button_width, button_height = 210, 50
+        button_padding = 20
+        bottom_margin = 20
+        button_y = HEIGHT - button_height - bottom_margin
 
-    # Suggest Move button
-    suggest_button_rect = pygame.Rect(10, button_y, button_width, button_height)
-    pygame.draw.rect(screen, (0, 170, 255), suggest_button_rect, border_radius=10)
-    suggest_text = font.render("Suggest Move", True, (255, 255, 255))
-    screen.blit(suggest_text, (suggest_button_rect.x + 25, suggest_button_rect.y + 12))
+        # Suggest Move button
+        suggest_button_rect = pygame.Rect(10, button_y, button_width, button_height)
+        pygame.draw.rect(screen, (0, 170, 255), suggest_button_rect, border_radius=10)
+        suggest_text = font.render("Suggest Move", True, (255, 255, 255))
+        screen.blit(suggest_text, (suggest_button_rect.x + 25, suggest_button_rect.y + 12))
 
-    # Back to Dashboard button
-    dashboard_button_rect = pygame.Rect(
-        suggest_button_rect.right + button_padding, button_y, button_width+40, button_height)
-    pygame.draw.rect(screen, (255, 100, 100), dashboard_button_rect, border_radius=10)
-    dashboard_text = font.render("Back to Dashboard", True, (255, 255, 255))
-    screen.blit(dashboard_text, (dashboard_button_rect.x + 10, dashboard_button_rect.y + 12))
+        # Back to Dashboard button
+        dashboard_button_rect = pygame.Rect(
+            suggest_button_rect.right + button_padding, button_y, button_width+40, button_height)
+        pygame.draw.rect(screen, (255, 100, 100), dashboard_button_rect, border_radius=10)
+        dashboard_text = font.render("Back to Dashboard", True, (255, 255, 255))
+        screen.blit(dashboard_text, (dashboard_button_rect.x + 10, dashboard_button_rect.y + 12))
 
-    # Restart button above the other two
-    restart_button_rect = pygame.Rect(
-        dashboard_button_rect.right + button_padding, button_y, button_width, button_height)
-    pygame.draw.rect(screen, (100, 200, 100), restart_button_rect, border_radius=10)
-    restart_text_btn = font.render("Restart", True, (255, 255, 255))
-    screen.blit(restart_text_btn, (restart_button_rect.x + 55, restart_button_rect.y + 12))
+        # Restart button above the other two
+        restart_button_rect = pygame.Rect(
+            dashboard_button_rect.right + button_padding, button_y, button_width, button_height)
+        pygame.draw.rect(screen, (100, 200, 100), restart_button_rect, border_radius=10)
+        restart_text_btn = font.render("Restart", True, (255, 255, 255))
+        screen.blit(restart_text_btn, (restart_button_rect.x + 55, restart_button_rect.y + 12))
 
-    # generate game board on new game, make a copy of the colors in case of restart
-    if new_game:
-        tube_colors = generate_start()
-        tube = len(tube_colors)
-        initial_colors = copy.deepcopy(tube_colors)
-        new_game = False
-    # draw tubes every cycle
-    else:
-        tube_rects = draw_tubes(tubes, tube_colors)
-    # check for victory every cycle
-    win = check_victory(tube_colors)
-    # event handling - Quit button exits, clicks select tubes, enter and space for restart and new board
-    for event in pygame.event.get():
-        tooltip.handle_event(event)
-        if event.type == pygame.QUIT:
-            run = False
-        if event.type == pygame.KEYUP:
-            if event.key == pygame.K_SPACE:
-                tube_colors = copy.deepcopy(initial_colors)
-            elif event.key == pygame.K_RETURN:
-                new_game = True
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if suggest_button_rect.collidepoint(event.pos):
-                # save_current_state(tube_colors, moves)
-                current_state_str = json.dumps(previous_tubes_colors)
+        # generate game board on new game, make a copy of the colors in case of restart
+        if new_game:
+            tube_colors = generate_start()
+            tube = len(tube_colors)
+            initial_colors = copy.deepcopy(tube_colors)
+            new_game = False
+        # draw tubes every cycle
+        else:
+            tube_rects = draw_tubes(tubes, tube_colors)
+        # check for victory every cycle
+        win = check_victory(tube_colors)
+        # event handling - Quit button exits, clicks select tubes, enter and space for restart and new board
+        for event in pygame.event.get():
+            tooltip.handle_event(event)
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_SPACE:
+                    tube_colors = copy.deepcopy(initial_colors)
+                elif event.key == pygame.K_RETURN:
+                    new_game = True
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if suggest_button_rect.collidepoint(event.pos):
+                    try:
+                        # 1. Prepare AI input
+                        ai_input = prepare_ai_input(previous_tubes_colors)
+                        current_state_str = json.dumps(ai_input)
+                        print("AI Input:", current_state_str)
+                        # 2. Generate prompt
+                        prompt = (
+    "You are a color sort game expert. Analyze this TOP-FIRST tube state and suggest the optimal move.\n"
+    "Rules:\n"
+    "1. Tubes are lists where FIRST element = TOP color\n"
+    "2. Moves must either:\n"
+    "   a) Pour into an EMPTY tube, or\n"
+    "   b) Match the TOP color of destination tube\n"
+    "3. Strategic priorities:\n"
+    "   - Create empty tubes for critical moves\n"
+    "   - Group same colors together\n"
+    "   - Avoid blocking colors under dissimilar tops\n\n"
+    f"Current state (top-first):\n{current_state_str}\n"
+    "Response format:\n"
+    "Move [COLOR] from Tube [X] to Tube [Y]: [1-sentence strategic reason]\n"
+    "Example:\n"
+    "Move 2 from Tube 0 to Tube 3: This groups purple colors while freeing Tube 0 for future organization."
+)
 
-                prompt = (
-                "This is the current state of my color sort game each row of the 2d array represents a tube and the different value in the columns represents the different colors in that tube now i want the next best possible move to complete the game and give the move and explain it briefly which color to move from which tube to which tube" \
-                )
 
-             # Call AI
-                ai_response = ai_call(current_state_str, prompt)
+                        # 3. Get AI response
+                        ai_response = ai_call(current_state_str, prompt)
 
-                tooltip.show(ai_response)
+                        # 4. Parse and validate
+                        # parsed = parse_ai_output(ai_response, previous_tubes_colors)
+                        # if not parsed or not validate_move(previous_tubes_colors, parsed):
+                        #     tooltip.show(f"Invalid suggestion\n{ai_response}")
+                        #     return
 
-                print("AI Suggestion:", ai_response)
-                print("Suggest Move button clicked : ", previous_tubes_colors)
-            # elif not selected:
-            #     for item in range(len(tube_rects)):
-            #         if tube_rects[item].collidepoint(event.pos):
-            #             selected = True
-            #             select_rect = item
-            elif restart_button_rect.collidepoint(event.pos):
-                tube_colors = copy.deepcopy(initial_colors)
-                moves = 0  # reset move counter on restart
-                selected = False
-                select_rect = 100
-                previous_tubes_colors = copy.deepcopy(tube_colors)
-            elif dashboard_button_rect.collidepoint(event.pos):
-                run = False  # Exit the game loop to go back to the dashboard
-                dashboard_loop()
-                
-            elif not selected:
-                for item in range(len(tube_rects)):
-                    if tube_rects[item].collidepoint(event.pos):
-                        selected = True
-                        select_rect = item
-            else:
-                for item in range(len(tube_rects)):
-                    if tube_rects[item].collidepoint(event.pos):
-                        dest_rect = item
-                        tube_colors = calc_move(tube_colors, select_rect, dest_rect)
-                        moves += 1  # increment move count here!
-                        selected = False
-                        select_rect = 100
-                        previous_tubes_colors = copy.deepcopy(tube_colors)
+                        # 5. Display valid suggestion
+                        tooltip.show(ai_response)
 
-    # draw 'victory' text when winning in middle, always show restart and new board text at top
-    if win:
-        victory_text = font.render('You Won! Press Enter for a new board!', True, 'white')
-        screen.blit(victory_text, (30, 265))
-    restart_text = font.render('Stuck? Space-Restart, Enter-New Board!', True, 'white')
-    moves_text = font.render(f'Moves: {moves}', True, 'white')
-    screen.blit(moves_text, (10, 40))
-    # Draw 'Suggest Move' button at bottom
+                    except Exception as e:
+                        tooltip.show(f"AI Error: {str(e)}")
+                    print("AI Suggestion:", ai_response)
+                    print("Suggest Move button clicked : ", previous_tubes_colors)
+                    import re
+                    match = re.search(r"Move (\d+) from Tube (\d+) to Tube (\d+)", ai_response)
+                    if match:
+                        color = int(match.group(1))
+                        from_tube = int(match.group(2))
+                        to_tube = int(match.group(3))
+                        
+                        # Validate the move
+                        # if validate_move(tube_colors, color, from_tube, to_tube):
+                        tooltip.show(ai_response)
+                    #     else:
+                    #         tooltip.show("Invalid AI suggestion: " + ai_response)
+                    # else:
+                    #     tooltip.show("AI response format error")
+                # elif not selected:
+                #     for item in range(len(tube_rects)):
+                #         if tube_rects[item].collidepoint(event.pos):
+                #             selected = True
+                #             select_rect = item
+                elif restart_button_rect.collidepoint(event.pos):
+                    tube_colors = copy.deepcopy(initial_colors)
+                    moves = 0  # reset move counter on restart
+                    selected = False
+                    select_rect = 100
+                    previous_tubes_colors = copy.deepcopy(tube_colors)
+                elif dashboard_button_rect.collidepoint(event.pos):
+                    running = False  # Exit the game loop to go back to the dashboard
+                     # Quit pygame
+                    # dashboard_loop()
+                    # pygame.quit() 
 
-    screen.blit(restart_text, (10, 10))
+                elif not selected:
+                    for item in range(len(tube_rects)):
+                        if tube_rects[item].collidepoint(event.pos):
+                            selected = True
+                            select_rect = item
+                else:
+                    for item in range(len(tube_rects)):
+                        if tube_rects[item].collidepoint(event.pos):
+                            dest_rect = item
+                            tube_colors = calc_move(tube_colors, select_rect, dest_rect)
+                            moves += 1  # increment move count here!
+                            selected = False
+                            select_rect = 100
+                            previous_tubes_colors = copy.deepcopy(tube_colors)
 
-    tooltip.draw(screen)
+        # draw 'victory' text when winning in middle, always show restart and new board text at top
+        if win:
+            victory_text = font.render('You Won! Press Enter for a new board!', True, 'white')
+            screen.blit(victory_text, (30, 265))
+        restart_text = font.render('Stuck? Space-Restart, Enter-New Board!', True, 'white')
+        moves_text = font.render(f'Moves: {moves}', True, 'white')
+        screen.blit(moves_text, (10, 40))
+        # Draw 'Suggest Move' button at bottom
 
-    # display all drawn items on screen, exit pygame if run == False
-    pygame.display.flip()
+        screen.blit(restart_text, (10, 10))
+
+        tooltip.draw(screen)
+
+        # display all drawn items on screen, exit pygame if running == False
+        pygame.display.flip()
