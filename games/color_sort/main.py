@@ -170,7 +170,7 @@ def calc_move(colors, selected_rect, destination):
                 if len(colors[selected_rect]) > 0:
                     colors[destination].append(color_on_top)
                     colors[selected_rect].pop(-1)
-    print(colors, length)
+    print(colors)
     previous_tubes_colors = copy.deepcopy(colors)
     return colors
 
@@ -196,7 +196,7 @@ import os
 def save_current_state(tube_colors, moves):
     file_path = os.path.abspath("current_state.txt")
     with open(file_path, "w") as f:
-        f.write(f"Moves: {moves}\n")
+        # f.write(f"Moves: {moves}\n")
         for tube in tube_colors:
             f.write(",".join(str(color) for color in tube) + "\n")
     print(f"State saved at: {file_path}")
@@ -239,6 +239,7 @@ def run():
             tube_colors = generate_start()
             tube = len(tube_colors)
             initial_colors = copy.deepcopy(tube_colors)
+            previous_tubes_colors = copy.deepcopy(tube_colors)
             new_game = False
         # draw tubes every cycle
         else:
@@ -259,7 +260,7 @@ def run():
                 if suggest_button_rect.collidepoint(event.pos):
                     # save_current_state(tube_colors, moves)
                     current_state_str = json.dumps(previous_tubes_colors)
-                    current_state_str = [list(reversed(tube)) for tube in tubes]
+                    current_state_str = [list(reversed(tube)) for tube in tube_colors]
                     prompt = (
         "You are a color sort game expert. Analyze this TOP-FIRST tube state and suggest the optimal move.\n"
         "Rules:\n"
@@ -279,12 +280,12 @@ def run():
     )
     
                  # Call AI
-                    ai_response = ai_call(current_state_str, prompt)
+                    ai_response = ai_call(json.dumps(current_state_str), prompt)
     
                     tooltip.show(ai_response)
     
                     print("AI Suggestion:", ai_response)
-                    print("Suggest Move button clicked : ", previous_tubes_colors)
+                    print("Suggest Move button clicked : ", current_state_str)
                 # elif not selected:
                 #     for item in range(len(tube_rects)):
                 #         if tube_rects[item].collidepoint(event.pos):
