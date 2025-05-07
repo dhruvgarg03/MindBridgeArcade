@@ -4,14 +4,23 @@ from pygame.locals import *
 from games.chess.piece import Piece
 from games.chess.chess import Chess
 from games.chess.utils import Utils
+from ai.aiCall import ai_call
+from tooltip.tooltip import Tooltip
+import json
 import copy
 from dashboard import dashboard_loop
 SUGGEST_BUTTON_RECT = pygame.Rect(660, 100, 140, 40)  # x, y, width, height
 DASHBOARD_BUTTON_RECT = pygame.Rect(660, 160, 180, 50)
-
+tooltip = Tooltip()
+# explanation = ""
 class Game:
     def __init__(self):
         # Add in __init__ of ChessAI class
+        # Add these counters as instance variables in __init__:
+        self.highlighted_move = None
+        self.highlighted_move_time = None  # Add this line
+
+
         self.piece_values = {
             'pawn': 1,
             'knight': 10,
@@ -71,6 +80,18 @@ class Game:
                      [2, 2, 0, 0, 0, 0, 2, 2],
                      [2, 3, 1, 0, 0, 1, 3, 2]]
         }
+        self.piece_location = {}
+        for file in 'abcdefgh':
+            self.piece_location[file] = {}
+            for rank in range(1, 9):
+                self.piece_location[file][rank] = []
+        # Set up starting pieces
+        pieces = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook']
+        for i, file in enumerate('abcdefgh'):
+            self.piece_location[file][1] = [f'white_{pieces[i]}']
+            self.piece_location[file][2] = ['white_pawn']
+            self.piece_location[file][7] = ['black_pawn']
+            self.piece_location[file][8] = [f'black_{pieces[i]}']
 
         # screen dimensions
         screen_width = 850
@@ -95,6 +116,7 @@ class Game:
         # set window caption
         pygame.display.set_caption(window_title)
         self.board = self.create_starting_board()
+        # print(self.board_to_fen(self.board))
         # get location of game icon
         icon_src = os.path.join(self.resources, "chess_icon.png")
         print(icon_src)
@@ -108,19 +130,18 @@ class Game:
         self.clock = pygame.time.Clock()
 
     def create_starting_board(self):
-        # Returns a standard 8x8 chess board setup
+    # Returns a standard 8x8 chess board setup (rank 8 at top, rank 1 at bottom)
         return [
-            ["white_rook", "white_knight", "white_bishop", "white_queen", "white_king", "white_bishop", "white_knight",
-             "white_rook"],
-            ["white_pawn"] * 8,
-            [None] * 8,
-            [None] * 8,
-            [None] * 8,
-            [None] * 8,
-            ["black_pawn"] * 8,
-            ["black_rook", "black_knight", "black_bishop", "black_queen", "black_king", "black_bishop", "black_knight",
-             "black_rook"]
+            ["black_rook", "black_knight", "black_bishop", "black_queen", "black_king", "black_bishop", "black_knight", "black_rook"],  # rank 8
+            ["black_pawn"] * 8,   # rank 7
+            [None] * 8,           # rank 6
+            [None] * 8,           # rank 5
+            [None] * 8,           # rank 4
+            [None] * 8,           # rank 3
+            ["white_pawn"] * 8,   # rank 2
+            ["white_rook", "white_knight", "white_bishop", "white_queen", "white_king", "white_bishop", "white_knight", "white_rook"]  # rank 1
         ]
+
     def piece_square_bonus(self, ptype, color, y, x):
         table = self.pst.get(ptype)
         if table:
@@ -147,16 +168,17 @@ class Game:
 
         return score
 
-    def piece_location_to_board(self,piece_location):
+    def piece_location_to_board(self, piece_location):
         board = [[None for _ in range(8)] for _ in range(8)]
         for file_idx, file_char in enumerate('abcdefgh'):
             for rank in range(1, 9):
-                piece = piece_location[file_char][rank][0]
-                x = file_idx
-                y = 8 - rank  # rank 8 is row 0, rank 1 is row 7
-                if piece:
-                    board[y][x] = piece
+                pieces = piece_location[file_char].get(rank, [])
+                piece = pieces[0] if pieces else None
+                x = file_idx  # a=0, h=7
+                y = 8 - rank  # rank 8 → y=0 (top row), rank 1 → y=7 (bottom row)
+                board[y][x] = piece
         return board
+
 
     def generate_legal_moves(self,board, color):
         moves = []
@@ -339,6 +361,40 @@ class Game:
                 if beta <= alpha:
                     break
             return min_eval, best_move
+    def board_to_fen(self, board, active_color, castling='KQkq', en_passant='-', halfmove='0', fullmove='1'):
+            piece_map = {
+                'white_pawn': 'P', 'black_pawn': 'p',
+                'white_knight': 'N', 'black_knight': 'n',
+                'white_bishop': 'B', 'black_bishop': 'b',
+                'white_rook': 'R', 'black_rook': 'r',
+                'white_queen': 'Q', 'black_queen': 'q',
+                'white_king': 'K', 'black_king': 'k'
+            }
+
+            fen_rows = []
+            for row in board:
+                fen_row = []
+                empty = 0
+                for piece in row:
+                    if piece:
+                        if empty:
+                            fen_row.append(str(empty))
+                            empty = 0
+                        fen_row.append(piece_map[piece])
+                    else:
+                        empty += 1
+                if empty:
+                    fen_row.append(str(empty))
+                fen_rows.append(''.join(fen_row))
+
+            return f"{'/'.join(fen_rows)} + f' {active_color} {castling} {en_passant} {halfmove} {fullmove}"
+    def move_to_notation(self, move):
+        if not move:
+            return ""
+        (from_x, from_y), (to_x, to_y) = move
+        files = 'abcdefgh'
+        return f"{files[from_x]}{8-from_y}{files[to_x]}{8-to_y}"
+
 
     def save_board_to_file(self,board, filename="board_state.txt"):
         with open(filename, "w") as f:
@@ -347,8 +403,22 @@ class Game:
 
     def suggest_move(self,board, turn):
         color = 'white' if turn['white'] else 'black'
-        _, move = self.minimax(board, depth=3, alpha=float('-inf'), beta=float('inf'), maximizing=True, color=color)
-        return move
+        _, move = self.minimax(board, depth=5, alpha=float('-inf'), beta=float('inf'), maximizing=True, color=color)
+        board_str = "\n".join([" ".join([piece[0] if piece else "." for piece in row]) 
+                          for row in board])
+    
+            # Craft prompt for explanation
+        prompt = f"""You are a chess coach. Briefly explain (1 sentence) why this move is strong:
+        Board (uppercase=white, lowercase=black):
+        {board_str}
+        Suggested move: {self.move_to_notation(move)}
+        Reason:"""
+
+            # Get AI explanation
+        explanation = ai_call(board_str, prompt)
+
+        return move, explanation
+        
     def start_game(self):
         """Function containing main game loop""" 
         # chess board offset
@@ -385,6 +455,7 @@ class Game:
             self.clock.tick(5)
             # poll events
             for event in pygame.event.get():
+                tooltip.handle_event(event)
                 # get keys pressed
                 key_pressed = pygame.key.get_pressed()
                 # check if the game has been closed by the user
@@ -396,10 +467,30 @@ class Game:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if SUGGEST_BUTTON_RECT.collidepoint(event.pos):
                         board_2d = self.piece_location_to_board(self.chess.piece_location)
-                        self.save_board_to_file(board_2d)
-                        suggested_move = self.suggest_move(board_2d, self.chess.turn)
-                        if suggested_move:
-                            self.highlighted_move = suggested_move
+                        self.save_board_to_file(board_2d)  # Save the board state to a file
+                        move,explanation = self.suggest_move(board_2d, self.chess.turn)
+                        if move:
+                            self.highlighted_move = move
+                            self.highlighted_move_time = pygame.time.get_ticks()
+                            print(f"Suggested move: {self.move_to_notation(move)}")
+                            tooltip.show(explanation)
+                        # print("Current board:")
+                        # for row in board_2d:
+                        #     print(row)
+
+                        # active_color = 'w' if self.chess.turn['white'] else 'b'
+                        # fen = self.board_to_fen(board_2d, active_color=active_color)  # Use FEN conversion
+                        # prompt = (
+                        #         "You are an expert chess player. Given the current chess board state in FEN notation, "
+                        #         "suggest the single best next move in algebraic notation for the current player. "
+                        #         "Briefly explain why this move is strong."
+                        #     )
+                        # print("Turn state:", self.chess.turn)
+                        # print("FEN:", fen)
+                        # ai_response = ai_call(fen, prompt)  # Pass FEN instead of color sort state
+                        # tooltip.show(ai_response)
+                        # print("AI Suggestion:", ai_response)
+
                     if DASHBOARD_BUTTON_RECT.collidepoint(event.pos):
                         self.run = False
                         dashboard_loop()
@@ -419,7 +510,13 @@ class Game:
             # for testing mechanics of the game
             #self.game()
             #self.declare_winner(winner)
-
+            tooltip.draw(self.screen)
+            HIGHLIGHT_DURATION = 2000  # milliseconds (2 seconds)
+            if self.highlighted_move is not None and self.highlighted_move_time is not None:
+                now = pygame.time.get_ticks()
+                if now - self.highlighted_move_time > HIGHLIGHT_DURATION:
+                    self.highlighted_move = None
+                    self.highlighted_move_time = None
             # update display
             pygame.display.flip()
             # update events
@@ -576,15 +673,6 @@ class Game:
             # clear winner
             self.chess.winner = ""
 
-    # def draw_highlighted_move(self,screen, move):
-    #     if move:
-    #         (from_x, from_y), (to_x, to_y) = move
-    #         square_size = 80  # Use your actual square size
-    #         highlight_color = (0, 255, 0, 100)  # semi-transparent green
-    #         s = pygame.Surface((square_size, square_size), pygame.SRCALPHA)
-    #         s.fill(highlight_color)
-    #         screen.blit(s, (from_x * square_size, from_y * square_size))
-    #         screen.blit(s, (to_x * square_size, to_y * square_size))
     def draw_highlighted_move(self, screen, move):
         if move:
             (from_x, from_y), (to_x, to_y) = move

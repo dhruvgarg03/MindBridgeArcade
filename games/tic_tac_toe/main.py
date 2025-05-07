@@ -2,7 +2,9 @@ import pygame
 import sys
 import copy
 from dashboard import dashboard_loop
-
+from ai.aiCall import ai_call
+from tooltip.tooltip import Tooltip
+import json
 pygame.init()
 
 # Constants
@@ -14,7 +16,7 @@ CIRCLE_WIDTH = 15
 CROSS_WIDTH = 20
 RADIUS = SQSIZE // 4
 OFFSET = 40
-
+tooltip = Tooltip()
 # Colors
 # BG_COLOR = (28, 170, 156)
 # LINE_COLOR = (23, 145, 135)
@@ -151,66 +153,121 @@ def check_winner():
     if winner or all(all(cell is not None for cell in row) for row in board):
         game_over = True
 
-def check_winner_simulation(temp_board):
-    # Returns 'X', 'O' or None for the winner without affecting game state
-    for i in range(3):
-        if temp_board[i][0] == temp_board[i][1] == temp_board[i][2] != None:
-            return temp_board[i][0]
-        if temp_board[0][i] == temp_board[1][i] == temp_board[2][i] != None:
-            return temp_board[0][i]
-
-    if temp_board[0][0] == temp_board[1][1] == temp_board[2][2] != None:
-        return temp_board[0][0]
-    if temp_board[0][2] == temp_board[1][1] == temp_board[2][0] != None:
-        return temp_board[0][2]
-
+def check_winner_simulation(board):
+    """Check for winner (for move analysis, not actual game)"""
+    for line in get_all_lines():
+        values = [board[i][j] for (i, j) in line]
+        if len(set(values)) == 1 and values[0] is not None:
+            return values[0]
     return None
 
+def get_empty_cells(board):
+    """Return list of (row, col) for empty cells (0-based indices)"""
+    return [(i, j) for i in range(3) for j in range(3) if board[i][j] is None]
 
-def minimax(b, is_maximizing):
-    temp_winner = check_winner_simulation(b)
-    if temp_winner == "O":
-        return 1
-    elif temp_winner == "X":
-        return -1
-    elif all(all(cell is not None for cell in row) for row in b):
-        return 0
+def get_all_lines():
+    """Return all rows, columns, and diagonals as lists of (row, col) tuples"""
+    lines = []
+    # Rows and columns
+    for i in range(3):
+        lines.append([(i, j) for j in range(3)])  # Rows
+        lines.append([(j, i) for j in range(3)])  # Columns
+    # Diagonals
+    lines.append([(i, i) for i in range(3)])      # Top-left to bottom-right
+    lines.append([(i, 2-i) for i in range(3)])    # Top-right to bottom-left
+    return lines
 
+def is_winning_move(board, move, player):
+    temp = [row.copy() for row in board]
+    temp[move[0]][move[1]] = player
+    return check_winner() == player
+
+def is_blocking_move(board, move, player):
+    opponent = 'O' if player == 'X' else 'X'
+    temp = [row.copy() for row in board]
+    temp[move[0]][move[1]] = opponent
+    return check_winner() == opponent
+
+def creates_fork(board, move, player):
+    temp = [row.copy() for row in board]
+    temp[move[0]][move[1]] = player
+    winning_paths = 0
+    # Check rows, columns, diagonals
+    for line in get_all_lines():
+        if sum(1 for cell in line if temp[cell[0]][cell[1]] == player) == 2:
+            winning_paths += 1
+    return winning_paths >= 2
+
+def minimax(board, depth, is_maximizing, player):
+    opponent = 'O' if player == 'X' else 'X'
+    
+    winner = check_winner_simulation(board)
+    if winner == player:
+        return 10 - depth
+    elif winner == opponent:
+        return depth - 10
+    elif len(get_empty_cells(board)) == 0:
+        return 0  # Draw
+    
     if is_maximizing:
         best_score = -float('inf')
-        for i in range(3):
-            for j in range(3):
-                if b[i][j] is None:
-                    b[i][j] = "O"
-                    score = minimax(b, False)
-                    b[i][j] = None
-                    best_score = max(score, best_score)
+        for move in get_empty_cells(board):
+            row, col = move
+            board[row][col] = player
+            score = minimax(board, depth + 1, False, player)
+            board[row][col] = None
+            best_score = max(score, best_score)
         return best_score
     else:
         best_score = float('inf')
-        for i in range(3):
-            for j in range(3):
-                if b[i][j] is None:
-                    b[i][j] = "X"
-                    score = minimax(b, True)
-                    b[i][j] = None
-                    best_score = min(score, best_score)
+        for move in get_empty_cells(board):
+            row, col = move
+            board[row][col] = opponent
+            score = minimax(board, depth + 1, True, player)
+            board[row][col] = None
+            best_score = min(score, best_score)
         return best_score
 
 
-def best_move(for_player="O"):
-    best_score = -float('inf') if for_player == "O" else float('inf')
-    move = None
-    for i in range(3):
-        for j in range(3):
-            if board[i][j] is None:
-                board[i][j] = for_player
-                score = minimax(copy.deepcopy(board), for_player == "X")
-                board[i][j] = None
-                if (for_player == "O" and score > best_score) or (for_player == "X" and score < best_score):
-                    best_score = score
-                    move = (i, j)
-    return move
+def board_to_string(board):
+    symbols = {None: '.', 'X': 'X', 'O': 'O'}
+    return "\n".join([" ".join(symbols[cell] for cell in row) for row in board])
+
+def move_to_rowcol(move):
+    """Convert (row, col) to (row, col) notation, both 1-based (top-left is (1, 1))."""
+    if not move:
+        return ""
+    row, col = move  # Both 0-based
+    # Convert to 1-based for display
+    return f"({row + 1}, {col + 1})"
+
+def best_move(board, player):
+    best_score = -float('inf')
+    best_move = None
+    move_analysis = {}
+
+    for move in get_empty_cells(board):
+        row, col = move
+        board[row][col] = player
+        score = minimax(board, 0, False, player)
+        board[row][col] = None
+
+        # Analyze move type
+        is_win = is_winning_move(board, move, player)
+        is_block = is_blocking_move(board, move, player)
+        is_fork = creates_fork(board, move, player)
+
+        move_analysis[move] = {
+            'score': score,
+            'type': 'win' if is_win else 'block' if is_block else 'fork' if is_fork else 'neutral'
+        }
+
+        if score > best_score:
+            best_score = score
+            best_move = move
+
+    return best_move, move_analysis.get(best_move, {}).get('type', 'neutral')
+
 
 
 def reset():
@@ -233,12 +290,12 @@ def run():
     while True:
         # restart_btn, suggest_btn = draw_board()
         restart_btn, suggest_btn, dashboard_btn = draw_board()
-
+        tooltip.draw(screen)
         pygame.display.update()
         clock.tick(60)
 
         if waiting_for_ai and pygame.time.get_ticks() - ai_timer_start > AI_DELAY_MS:
-            move = best_move()
+            move,move_type = best_move(board, player)
             if move:
                 board[move[0]][move[1]] = "O"
             check_winner()
@@ -246,6 +303,7 @@ def run():
             waiting_for_ai = False
 
         for event in pygame.event.get():
+            tooltip.handle_event(event)
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
@@ -265,8 +323,25 @@ def run():
             
             if not game_over and event.type == pygame.MOUSEBUTTONDOWN:
                 if suggest_btn and suggest_btn.collidepoint(pygame.mouse.get_pos()):
-                    suggested_move = best_move(for_player="X")
+                    suggested_move, move_type = best_move(board, "X")
+                    if suggested_move:
+            # Prepare AI prompt
+                        move, move_type = best_move(board, player)
+                        board_str = board_to_string(board)
+                        move_str = move_to_rowcol(suggested_move)
+                        print(board_str)
+                        prompt = f"""You are a Tic-Tac-Toe expert. Given the board below and the move played by X, explain in 1-2 sentences what this move accomplishes. If it does not win or block a win, say so.
+                            Do not assume the move creates a win unless it actually does on this board.
+                            Board:
+                            {board_str}
+                            Move played: {move_str}
+                            Move type: {move_type.capitalize()} move
+                            Reasoning:"""
 
+                         # Get AI explanation
+                        explanation = ai_call(board_str, prompt)
+                        print(explanation)
+                        tooltip.show(explanation)
             if game_over and event.type == pygame.MOUSEBUTTONDOWN:
                 if restart_btn and restart_btn.collidepoint(pygame.mouse.get_pos()):
                     reset()
