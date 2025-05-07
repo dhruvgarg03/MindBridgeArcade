@@ -28,7 +28,7 @@ Mind-Bridge Arcade is a collection of classic games enhanced with AI-powered mov
 ## Installation  
 1. Clone the repository:  
     ```bash  
-    git clone https://github.com/dhruvgarg03/minor-project2.git 
+    git clone https://github.com/dhruvgarg03/MindBridgeArcade.git 
     ```  
 2. Install dependencies:  
     ```bash  
