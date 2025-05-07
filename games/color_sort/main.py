@@ -202,6 +202,7 @@ def save_current_state(tube_colors, moves):
     print(f"State saved at: {file_path}")
 
 def run():
+    global tube_colors, initial_colors, new_game, selected, select_rect, win, moves, previous_tubes_colors
     running = True
     while running:
         screen.fill((30, 30, 30))
