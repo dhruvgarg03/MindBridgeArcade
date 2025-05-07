@@ -9,6 +9,7 @@ Mind-Bridge Arcade is a collection of classic games enhanced with AI-powered mov
 - **Dots & Connect**: Connect dots to create boxes with smart move recommendations  
 - **Maze Runner**: Navigate through mazes with pathfinding assistance  
 - **Color Sort**: Color-based puzzle game with solution hints  
+- **sudoku**: Number-placement puzzle with intelligent hint system for strategic solving
 
 ## Features  
 - 🤖 AI-powered move suggestions  
